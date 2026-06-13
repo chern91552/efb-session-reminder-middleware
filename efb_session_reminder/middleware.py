@@ -44,7 +44,7 @@ class SessionReminderMiddleware(Middleware):
 
     middleware_id: ModuleID = ModuleID("efb_session_reminder")
     middleware_name: str = "Session Reminder Middleware"
-    __version__: str = '2.7.0'
+    __version__: str = '2.8.0'
 
     DEFAULT_SESSION_VALIDITY_DAYS = 30
     DEFAULT_REMINDER_THRESHOLDS = [5, 3, 1]
@@ -808,13 +808,13 @@ class SessionReminderMiddleware(Middleware):
         qr_image = self._get_preemptive_qr_code('blueset.wechat')
 
         if qr_image:
+            # First: Send QR code to user
             text = (
                 "📱 登录二维码\n\n"
                 "请使用微信扫描下方二维码登录。\n"
                 "扫码后，当前会话将被新会话替换，消息不会中断。"
             )
 
-            # Send to the source channel
             if source == 'telegram':
                 self._send_to_telegram(text, "info")
                 self._send_qr_to_telegram(qr_image)
@@ -822,7 +822,7 @@ class SessionReminderMiddleware(Middleware):
                 self._send_to_wechat(text)
                 self._send_qr_to_wechat(qr_image)
 
-            # Logout WeChat to force re-login
+            # Second: Logout WeChat to force re-login
             self._force_wechat_logout()
         else:
             error_msg = (
