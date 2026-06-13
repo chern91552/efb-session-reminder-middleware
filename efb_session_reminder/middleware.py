@@ -44,7 +44,7 @@ class SessionReminderMiddleware(Middleware):
 
     middleware_id: ModuleID = ModuleID("efb_session_reminder")
     middleware_name: str = "Session Reminder Middleware"
-    __version__: str = '2.1.0'
+    __version__: str = '2.2.0'
 
     DEFAULT_SESSION_VALIDITY_DAYS = 30
     DEFAULT_REMINDER_THRESHOLDS = [5, 3, 1]
@@ -154,10 +154,55 @@ class SessionReminderMiddleware(Middleware):
 
             self._stop_event.wait(self.check_interval)
 
+    def _is_wechat_session_active(self, channel_id: str) -> bool:
+        """Check if WeChat session is active by checking sync responses."""
+        try:
+            if not hasattr(coordinator, 'slaves') or channel_id not in coordinator.slaves:
+                return False
+
+            wechat_channel = coordinator.slaves[channel_id]
+
+            if not hasattr(wechat_channel, 'bot') or not wechat_channel.bot:
+                return False
+
+            bot = wechat_channel.bot
+
+            # Check if bot has a core with active session
+            if hasattr(bot, 'core') and bot.core:
+                core = bot.core
+
+                # Check if the session cookies exist
+                if hasattr(core, 's') and core.s:
+                    cookies = core.s.cookies.get_dict()
+                    if 'wxuin' in cookies and 'wxsid' in cookies:
+                        return True
+
+            return False
+
+        except Exception as e:
+            self.logger.debug(f"Error checking WeChat session status: {e}")
+            return False
+
     def _check_all_sessions(self):
         now = datetime.now()
 
         for channel_id in self.monitored_channels:
+            # Auto-update login time if WeChat session is active
+            if channel_id == 'blueset.wechat':
+                if self._is_wechat_session_active(channel_id):
+                    # Session is active, auto-update login time
+                    if channel_id in self._login_times:
+                        # Only update if more than 1 day has passed since last record
+                        last_recorded = self._login_times[channel_id]
+                        if (now - last_recorded).days >= 1:
+                            self.logger.info(f"Auto-updating login time: WeChat session is active")
+                            self._force_update_login_time(channel_id, notify=False)
+                    else:
+                        # First time, record login time
+                        self.logger.info(f"Auto-recording login time: WeChat session is active")
+                        self._record_login(channel_id, notify=False)
+                    continue
+
             if channel_id not in self._login_times:
                 self.logger.debug(f"No login time recorded for {channel_id}")
                 continue
@@ -692,10 +737,10 @@ class SessionReminderMiddleware(Middleware):
                     self.logger.info(f"Login event detected: matched pattern '{pattern}'")
 
                     # Force update login time
-                    self._force_update_login_time(channel_id)
+                    self._force_update_login_time(channel_id, notify=True)
                     break
 
-    def _force_update_login_time(self, channel_id: str):
+    def _force_update_login_time(self, channel_id: str, notify: bool = True):
         """Force update the login time for a channel."""
         now = datetime.now()
         old_time = self._login_times.get(channel_id)
@@ -706,21 +751,22 @@ class SessionReminderMiddleware(Middleware):
 
         self.logger.info(f"Login time force updated for {channel_id}: {old_time} -> {now}")
 
-        expiry = now + timedelta(days=self.session_validity_days)
-        text = (
-            f"✅ 登录已更新\n\n"
-            f"频道: {self._get_channel_name(channel_id)}\n"
-            f"新登录时间: {now.strftime('%Y-%m-%d %H:%M')}\n"
-            f"过期时间: {expiry.strftime('%Y-%m-%d %H:%M')}\n"
-            f"有效期: {self.session_validity_days} 天"
-        )
+        if notify:
+            expiry = now + timedelta(days=self.session_validity_days)
+            text = (
+                f"✅ 登录已更新\n\n"
+                f"频道: {self._get_channel_name(channel_id)}\n"
+                f"新登录时间: {now.strftime('%Y-%m-%d %H:%M')}\n"
+                f"过期时间: {expiry.strftime('%Y-%m-%d %H:%M')}\n"
+                f"有效期: {self.session_validity_days} 天"
+            )
 
-        if 'telegram' in self.delivery_channels:
-            self._send_to_telegram(text, "info")
-        if 'wechat' in self.delivery_channels:
-            self._send_to_wechat(text)
+            if 'telegram' in self.delivery_channels:
+                self._send_to_telegram(text, "info")
+            if 'wechat' in self.delivery_channels:
+                self._send_to_wechat(text)
 
-    def _record_login(self, channel_id: str, source: str = 'telegram'):
+    def _record_login(self, channel_id: str, source: str = 'telegram', notify: bool = True):
         now = datetime.now()
         self._login_times[channel_id] = now
         self._save_login_times()
@@ -728,19 +774,20 @@ class SessionReminderMiddleware(Middleware):
 
         self.logger.info(f"Login recorded for {channel_id} at {now}")
 
-        expiry = now + timedelta(days=self.session_validity_days)
-        text = (
-            f"✅ 登录已记录\n\n"
-            f"频道: {self._get_channel_name(channel_id)}\n"
-            f"登录时间: {now.strftime('%Y-%m-%d %H:%M')}\n"
-            f"预计过期: {expiry.strftime('%Y-%m-%d %H:%M')}\n"
-            f"有效期: {self.session_validity_days} 天"
-        )
+        if notify:
+            expiry = now + timedelta(days=self.session_validity_days)
+            text = (
+                f"✅ 登录已记录\n\n"
+                f"频道: {self._get_channel_name(channel_id)}\n"
+                f"登录时间: {now.strftime('%Y-%m-%d %H:%M')}\n"
+                f"预计过期: {expiry.strftime('%Y-%m-%d %H:%M')}\n"
+                f"有效期: {self.session_validity_days} 天"
+            )
 
-        if source == 'telegram' or 'telegram' in self.delivery_channels:
-            self._send_to_telegram(text, "info")
-        if source == 'wechat' or 'wechat' in self.delivery_channels:
-            self._send_to_wechat(text)
+            if source == 'telegram' or 'telegram' in self.delivery_channels:
+                self._send_to_telegram(text, "info")
+            if source == 'wechat' or 'wechat' in self.delivery_channels:
+                self._send_to_wechat(text)
 
     def _handle_status_command(self, message: Message, source: str = 'telegram'):
         status_text = self._get_status_report()
