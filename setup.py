@@ -1,16 +1,11 @@
 import sys
-import os
 from setuptools import setup, find_packages
 
 if sys.version_info < (3, 6):
     raise Exception(
         "Python 3.6 or higher is required. Your version is %s." % sys.version)
 
-version_path = os.path.join(os.path.dirname(os.path.realpath(__file__)),
-                            'efb_session_reminder/__version__.py')
-
-__version__ = ""
-exec(open(version_path).read())
+__version__ = "1.4.0"
 
 long_description = open('README.md', encoding="utf-8").read()
 
@@ -22,13 +17,12 @@ setup(
     description='A middleware for EFB that reminds users before WeChat session expires',
     long_description=long_description,
     long_description_content_type='text/markdown',
-    author='Your Name',
-    author_email='your.email@example.com',
-    url='https://github.com/yourusername/efb-session-reminder-middleware',
+    author='chern91552',
+    author_email='chern91552@example.com',
+    url='https://github.com/chern91552/efb-session-reminder-middleware',
     license='GPLv3',
-    include_package_data=True,
     python_requires='>=3.6',
-    keywords=['ehforwarderbot', 'EH Forwarder Bot', 'EH Forwarder Bot Middleware', 
+    keywords=['ehforwarderbot', 'EH Forwarder Bot', 'EH Forwarder Bot Middleware',
               'WeChat', 'Session', 'Reminder'],
     classifiers=[
         "Development Status :: 4 - Beta",
@@ -41,6 +35,7 @@ setup(
         "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9",
         "Programming Language :: Python :: 3.10",
+        "Programming Language :: Python :: 3.11",
         "Topic :: Communications :: Chat",
         "Topic :: Utilities"
     ],
@@ -48,6 +43,9 @@ setup(
         "ehforwarderbot>=2.0.0",
         "ruamel.yaml",
     ],
+    extras_require={
+        "qr": ["pyqrcode"],
+    },
     entry_points={
         "ehforwarderbot.middleware": "efb_session_reminder = efb_session_reminder:SessionReminderMiddleware"
     }
