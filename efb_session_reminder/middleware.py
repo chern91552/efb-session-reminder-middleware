@@ -44,7 +44,7 @@ class SessionReminderMiddleware(Middleware):
 
     middleware_id: ModuleID = ModuleID("efb_session_reminder")
     middleware_name: str = "Session Reminder Middleware"
-    __version__: str = '2.2.0'
+    __version__: str = '2.3.0'
 
     DEFAULT_SESSION_VALIDITY_DAYS = 30
     DEFAULT_REMINDER_THRESHOLDS = [5, 3, 1]
@@ -154,55 +154,10 @@ class SessionReminderMiddleware(Middleware):
 
             self._stop_event.wait(self.check_interval)
 
-    def _is_wechat_session_active(self, channel_id: str) -> bool:
-        """Check if WeChat session is active by checking sync responses."""
-        try:
-            if not hasattr(coordinator, 'slaves') or channel_id not in coordinator.slaves:
-                return False
-
-            wechat_channel = coordinator.slaves[channel_id]
-
-            if not hasattr(wechat_channel, 'bot') or not wechat_channel.bot:
-                return False
-
-            bot = wechat_channel.bot
-
-            # Check if bot has a core with active session
-            if hasattr(bot, 'core') and bot.core:
-                core = bot.core
-
-                # Check if the session cookies exist
-                if hasattr(core, 's') and core.s:
-                    cookies = core.s.cookies.get_dict()
-                    if 'wxuin' in cookies and 'wxsid' in cookies:
-                        return True
-
-            return False
-
-        except Exception as e:
-            self.logger.debug(f"Error checking WeChat session status: {e}")
-            return False
-
     def _check_all_sessions(self):
         now = datetime.now()
 
         for channel_id in self.monitored_channels:
-            # Auto-update login time if WeChat session is active
-            if channel_id == 'blueset.wechat':
-                if self._is_wechat_session_active(channel_id):
-                    # Session is active, auto-update login time
-                    if channel_id in self._login_times:
-                        # Only update if more than 1 day has passed since last record
-                        last_recorded = self._login_times[channel_id]
-                        if (now - last_recorded).days >= 1:
-                            self.logger.info(f"Auto-updating login time: WeChat session is active")
-                            self._force_update_login_time(channel_id, notify=False)
-                    else:
-                        # First time, record login time
-                        self.logger.info(f"Auto-recording login time: WeChat session is active")
-                        self._record_login(channel_id, notify=False)
-                    continue
-
             if channel_id not in self._login_times:
                 self.logger.debug(f"No login time recorded for {channel_id}")
                 continue
