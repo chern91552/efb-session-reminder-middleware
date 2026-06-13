@@ -44,7 +44,7 @@ class SessionReminderMiddleware(Middleware):
 
     middleware_id: ModuleID = ModuleID("efb_session_reminder")
     middleware_name: str = "Session Reminder Middleware"
-    __version__: str = '1.8.0'
+    __version__: str = '1.9.0'
 
     DEFAULT_SESSION_VALIDITY_DAYS = 30
     DEFAULT_REMINDER_THRESHOLDS = [5, 3, 1]
@@ -348,8 +348,20 @@ class SessionReminderMiddleware(Middleware):
     def _send_to_telegram(self, text: str, level: str = "info"):
         """Send message to Telegram."""
         try:
+            # Get a slave channel for creating the system chat
+            slave_channel = None
+            if hasattr(coordinator, 'slaves') and coordinator.slaves:
+                for ch_id in self.monitored_channels:
+                    if ch_id in coordinator.slaves:
+                        slave_channel = coordinator.slaves[ch_id]
+                        break
+
+            if not slave_channel:
+                self.logger.warning("No slave channel available for sending to Telegram")
+                return
+
             system_chat = SystemChat(
-                channel=coordinator.master,
+                channel=slave_channel,
                 name="会话提醒助手",
                 uid=ChatID(f"__session_reminder_{uuid.uuid4()}__")
             )
