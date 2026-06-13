@@ -326,7 +326,25 @@ A: 打开微信「文件传输助手」，发送命令即可。支持 `getqr`、
 | `auto_qr` | bool | `true` | 自动生成二维码 |
 | `delivery_channels` | list | `[telegram, wechat]` | 发送渠道 |
 | `wechat_recipient` | str | `filehelper` | 微信接收人 |
-| `monitored_channels` | list | `[blueset.wechat]` | 监控频道 |
+| `monitored_channels` | list | `[blueset.wechat]` | 监控频道列表 |
+
+### monitored_channels 详解
+
+`monitored_channels` 用于指定要监控哪些从频道的登录状态。
+
+```yaml
+# 监控一个频道（默认配置，适合大多数用户）
+monitored_channels:
+  - blueset.wechat
+
+# 监控多个频道（高级用户）
+monitored_channels:
+  - blueset.wechat        # 微信频道
+  - another.wechat         # 第二个微信账号
+  - some.other.slave       # 其他从频道
+```
+
+**普通用户保持默认即可**，只有在使用多个从频道时才需要修改。
 
 ## 版本历史
 
