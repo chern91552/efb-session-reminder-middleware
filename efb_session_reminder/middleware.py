@@ -44,7 +44,7 @@ class SessionReminderMiddleware(Middleware):
 
     middleware_id: ModuleID = ModuleID("efb_session_reminder")
     middleware_name: str = "Session Reminder Middleware"
-    __version__: str = '2.3.0'
+    __version__: str = '2.4.0'
 
     DEFAULT_SESSION_VALIDITY_DAYS = 30
     DEFAULT_REMINDER_THRESHOLDS = [5, 3, 1]
@@ -80,6 +80,10 @@ class SessionReminderMiddleware(Middleware):
         # WeChat recipient for reminders (can be username, remark, or 'filehelper')
         self.wechat_recipient: str = self.config.get('wechat_recipient', 'filehelper')
 
+        # Reset login time on startup
+        # When True, clears old login time on middleware startup and records first message time
+        self.reset_on_startup: bool = self.config.get('reset_on_startup', True)
+
         self._login_times: Dict[str, datetime] = {}
         self._last_reminder: Dict[str, Dict[int, datetime]] = {}
 
@@ -111,6 +115,18 @@ class SessionReminderMiddleware(Middleware):
 
     def _load_login_times(self):
         login_file = self.data_path / "login_times.json"
+
+        # Check if we should reset login times on startup
+        # This ensures we record the actual login time when EFB starts
+        if self.reset_on_startup:
+            if login_file.exists():
+                try:
+                    login_file.unlink()
+                    self.logger.info("Cleared old login time file on startup")
+                except Exception as e:
+                    self.logger.error(f"Failed to clear login time file: {e}")
+            return  # Don't load anything, wait for first message
+
         if login_file.exists():
             try:
                 with open(login_file, 'r', encoding='utf-8') as f:

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "efb-session-reminder-middleware"
-version = "2.3.0"
+version = "2.4.0"
 description = "A middleware for EFB that reminds users before WeChat session expires"
 readme = "README.md"
 license = {text = "GPL-3.0"}
