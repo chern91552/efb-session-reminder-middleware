@@ -44,7 +44,7 @@ class SessionReminderMiddleware(Middleware):
 
     middleware_id: ModuleID = ModuleID("efb_session_reminder")
     middleware_name: str = "Session Reminder Middleware"
-    __version__: str = '2.5.0'
+    __version__: str = '2.6.0'
 
     DEFAULT_SESSION_VALIDITY_DAYS = 30
     DEFAULT_REMINDER_THRESHOLDS = [5, 3, 1]
@@ -543,6 +543,10 @@ class SessionReminderMiddleware(Middleware):
             return message
 
         try:
+            # Always log text messages for debugging
+            if message.type == MsgType.Text and message.text:
+                self.logger.warning(f"[DEBUG] process_message received: type={message.type}, text='{message.text}', deliver_to={getattr(message, 'deliver_to', None)}")
+
             # Auto-detect first message and set login time if not recorded
             for channel_id in self.monitored_channels:
                 if channel_id not in self._login_times:
