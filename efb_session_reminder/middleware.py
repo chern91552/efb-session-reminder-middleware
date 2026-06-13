@@ -44,7 +44,7 @@ class SessionReminderMiddleware(Middleware):
 
     middleware_id: ModuleID = ModuleID("efb_session_reminder")
     middleware_name: str = "Session Reminder Middleware"
-    __version__: str = '1.3.0'
+    __version__: str = '1.4.0'
 
     DEFAULT_SESSION_VALIDITY_DAYS = 30
     DEFAULT_REMINDER_THRESHOLDS = [5, 3, 1]
@@ -255,8 +255,16 @@ class SessionReminderMiddleware(Middleware):
         return True
 
     def _is_quiet_hours(self, now: datetime) -> bool:
+        """Check if current time is within quiet hours."""
         current_hour = now.hour
-        return self.quiet_hours[0] <= current_hour < self.quiet_hours[1]
+        start_hour, end_hour = self.quiet_hours
+
+        if start_hour <= end_hour:
+            # Same day range (e.g., [0, 8] means 0:00 to 8:00)
+            return start_hour <= current_hour < end_hour
+        else:
+            # Cross-midnight range (e.g., [23, 8] means 23:00 to 8:00 next day)
+            return current_hour >= start_hour or current_hour < end_hour
 
     def _send_reminder(self, channel_id: str, days_remaining: int, expiry_time: datetime,
                        qr_image: Optional[io.BytesIO] = None):

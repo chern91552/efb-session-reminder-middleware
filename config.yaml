@@ -21,12 +21,12 @@ reminder_thresholds:
 # Quiet hours - no reminders during this time period
 # Format: [start_hour, end_hour] (24-hour format)
 # Example: [0, 8] means no reminders between midnight and 8 AM
-# 静默时段，此时间段内不发送提醒
+# 静默时段（不发送提醒的时间）
 # 格式: [开始小时, 结束小时]（24小时制）
-# 示例: [0, 8] 表示凌晨0点到早上8点不发送提醒
+# 支持跨午夜的时间段，例如 [23, 10] 表示晚上23点到次日早上10点
 quiet_hours:
-  - 0
-  - 8
+  - 23   # 晚上 23:00
+  - 10   # 到早上 10:00
 
 # Check interval in seconds
 # How often to check session status
