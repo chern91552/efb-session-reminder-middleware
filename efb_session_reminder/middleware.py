@@ -44,7 +44,7 @@ class SessionReminderMiddleware(Middleware):
 
     middleware_id: ModuleID = ModuleID("efb_session_reminder")
     middleware_name: str = "Session Reminder Middleware"
-    __version__: str = '1.5.0'
+    __version__: str = '1.6.0'
 
     DEFAULT_SESSION_VALIDITY_DAYS = 30
     DEFAULT_REMINDER_THRESHOLDS = [5, 3, 1]
@@ -513,6 +513,39 @@ class SessionReminderMiddleware(Middleware):
             return message
 
         try:
+            # Auto-detect first message and set login time if not recorded
+            for channel_id in self.monitored_channels:
+                if channel_id not in self._login_times:
+                    # Check if this message is from a monitored channel
+                    if hasattr(message.author, 'module_id') and message.author.module_id == channel_id:
+                        # This is a message from the monitored channel
+                        # Use the message's timestamp as the login time
+                        if hasattr(message, 'time') and message.time:
+                            login_time = message.time
+                        else:
+                            login_time = datetime.now()
+
+                        self._login_times[channel_id] = login_time
+                        self._save_login_times()
+                        self._last_reminder[channel_id] = {}
+
+                        expiry = login_time + timedelta(days=self.session_validity_days)
+                        self.logger.info(f"Auto-detected login time for {channel_id}: {login_time}")
+
+                        # Send notification (optional)
+                        text = (
+                            f"✅ 登录时间已自动记录\n\n"
+                            f"频道: {self._get_channel_name(channel_id)}\n"
+                            f"登录时间: {login_time.strftime('%Y-%m-%d %H:%M')}\n"
+                            f"预计过期: {expiry.strftime('%Y-%m-%d %H:%M')}\n"
+                            f"有效期: {self.session_validity_days} 天"
+                        )
+
+                        if 'telegram' in self.delivery_channels:
+                            self._send_to_telegram(text, "info")
+                        if 'wechat' in self.delivery_channels:
+                            self._send_to_wechat(text)
+
             # Detect login events from messages sent to master (Telegram)
             if message.deliver_to == coordinator.master:
                 self._detect_login_event(message)
