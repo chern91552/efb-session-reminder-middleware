@@ -1,0 +1,71 @@
+# EFB Session Reminder Middleware Configuration
+# 会话过期提醒中间件配置文件
+
+# Enable or disable the middleware
+# 是否启用中间件
+enabled: true
+
+# Session validity period in days
+# WeChat Web session typically expires after 30 days
+# 会话有效期（天数），微信网页版通常为30天
+session_validity_days: 30
+
+# Reminder thresholds in days before expiry
+# Reminders will be sent at these intervals
+# 提醒阈值（过期前几天），在这些时间点发送提醒
+reminder_thresholds:
+  - 5   # 5 days before expiry / 过期前5天
+  - 3   # 3 days before expiry / 过期前3天
+  - 1   # 1 day before expiry / 过期前1天
+
+# Quiet hours - no reminders during this time period
+# Format: [start_hour, end_hour] (24-hour format)
+# Example: [0, 8] means no reminders between midnight and 8 AM
+# 静默时段，此时间段内不发送提醒
+# 格式: [开始小时, 结束小时]（24小时制）
+# 示例: [0, 8] 表示凌晨0点到早上8点不发送提醒
+quiet_hours:
+  - 0
+  - 8
+
+# Check interval in seconds
+# How often to check session status
+# 检查间隔（秒），多久检查一次会话状态
+check_interval: 3600  # Check every hour / 每小时检查一次
+
+# List of channel IDs to monitor
+# The middleware will track login times for these channels
+# 监控的频道ID列表，中间件会跟踪这些频道的登录时间
+monitored_channels:
+  - blueset.wechat  # WeChat Web channel / 微信网页版频道
+
+# QR code configuration
+# 二维码配置
+
+# QR code generation threshold in days
+# QR code will be included in reminders when days remaining <= this value
+# 二维码生成阈值（天），当剩余天数<=此值时，提醒中会包含二维码
+qr_threshold_days: 3
+
+# Auto-generate QR code in reminders
+# When enabled, QR code will be automatically included in reminders
+# 是否在提醒中自动生成二维码（配置开关）
+auto_qr: true
+
+# Delivery channels for reminders
+# Options: 'telegram', 'wechat', or ['telegram', 'wechat'] (both)
+# 消息发送渠道
+# 选项: 'telegram'（仅Telegram）、'wechat'（仅微信）、['telegram', 'wechat']（两者都发）
+delivery_channels:
+  - telegram
+  - wechat
+
+# WeChat recipient for reminders
+# Options:
+#   - 'filehelper': Send to File Transfer Assistant (文件传输助手)
+#   - Contact name/remark: Send to a specific friend or group
+# 微信接收人设置
+# 选项:
+#   - 'filehelper': 发送到文件传输助手
+#   - 联系人名称/备注名: 发送到指定的联系人或群聊
+wechat_recipient: 'filehelper'

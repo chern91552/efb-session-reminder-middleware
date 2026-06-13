@@ -1,0 +1,4 @@
+include README.md
+include config.yaml
+recursive-include efb_session_reminder *.py
+recursive-include efb_session_reminder/locale *.po *.mo
