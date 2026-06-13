@@ -44,7 +44,7 @@ class SessionReminderMiddleware(Middleware):
 
     middleware_id: ModuleID = ModuleID("efb_session_reminder")
     middleware_name: str = "Session Reminder Middleware"
-    __version__: str = '2.4.0'
+    __version__: str = '2.5.0'
 
     DEFAULT_SESSION_VALIDITY_DAYS = 30
     DEFAULT_REMINDER_THRESHOLDS = [5, 3, 1]
@@ -675,6 +675,7 @@ class SessionReminderMiddleware(Middleware):
     def _detect_login_event(self, message: Message):
         if message.type == MsgType.Text and message.text:
             text = message.text.lower()
+            self.logger.debug(f"Checking login event for text: {message.text}")
 
             # Comprehensive login patterns to detect successful login
             login_patterns = [
@@ -705,11 +706,13 @@ class SessionReminderMiddleware(Middleware):
                     # Try to find the WeChat channel
                     channel_id = 'blueset.wechat'  # Default to WeChat channel
 
-                    self.logger.info(f"Login event detected: matched pattern '{pattern}'")
+                    self.logger.info(f"Login event detected: matched pattern '{pattern}' in message: {message.text}")
 
                     # Force update login time
                     self._force_update_login_time(channel_id, notify=True)
                     break
+        else:
+            self.logger.debug(f"Skipping login event check: type={message.type}, text={getattr(message, 'text', None)}")
 
     def _force_update_login_time(self, channel_id: str, notify: bool = True):
         """Force update the login time for a channel."""
