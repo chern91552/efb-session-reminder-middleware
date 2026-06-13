@@ -44,7 +44,7 @@ class SessionReminderMiddleware(Middleware):
 
     middleware_id: ModuleID = ModuleID("efb_session_reminder")
     middleware_name: str = "Session Reminder Middleware"
-    __version__: str = '2.0.0'
+    __version__: str = '2.1.0'
 
     DEFAULT_SESSION_VALIDITY_DAYS = 30
     DEFAULT_REMINDER_THRESHOLDS = [5, 3, 1]
@@ -648,6 +648,13 @@ class SessionReminderMiddleware(Middleware):
             self._handle_set_login_time_command(message, source)
         elif text in ['getqr', '获取二维码', 'qr']:
             self._handle_get_qr_command(message, source)
+        elif text in ['refreshlogin', '刷新登录', '更新登录']:
+            self._handle_refresh_login_command(message, source)
+
+    def _handle_refresh_login_command(self, message: Message, source: str = 'telegram'):
+        """Handle the refresh login time command."""
+        channel_id = 'blueset.wechat'
+        self._force_update_login_time(channel_id)
 
     def _detect_login_event(self, message: Message):
         if message.type == MsgType.Text and message.text:
@@ -678,11 +685,40 @@ class SessionReminderMiddleware(Middleware):
 
             for pattern in login_patterns:
                 if pattern in text:
-                    channel_id = getattr(message.author, 'channel_id', None)
-                    if channel_id:
-                        self.logger.info(f"Login event detected for {channel_id}: matched pattern '{pattern}'")
-                        self._record_login(channel_id)
+                    # Force update login time when login event is detected
+                    # Try to find the WeChat channel
+                    channel_id = 'blueset.wechat'  # Default to WeChat channel
+
+                    self.logger.info(f"Login event detected: matched pattern '{pattern}'")
+
+                    # Force update login time
+                    self._force_update_login_time(channel_id)
                     break
+
+    def _force_update_login_time(self, channel_id: str):
+        """Force update the login time for a channel."""
+        now = datetime.now()
+        old_time = self._login_times.get(channel_id)
+
+        self._login_times[channel_id] = now
+        self._save_login_times()
+        self._last_reminder[channel_id] = {}
+
+        self.logger.info(f"Login time force updated for {channel_id}: {old_time} -> {now}")
+
+        expiry = now + timedelta(days=self.session_validity_days)
+        text = (
+            f"✅ 登录已更新\n\n"
+            f"频道: {self._get_channel_name(channel_id)}\n"
+            f"新登录时间: {now.strftime('%Y-%m-%d %H:%M')}\n"
+            f"过期时间: {expiry.strftime('%Y-%m-%d %H:%M')}\n"
+            f"有效期: {self.session_validity_days} 天"
+        )
+
+        if 'telegram' in self.delivery_channels:
+            self._send_to_telegram(text, "info")
+        if 'wechat' in self.delivery_channels:
+            self._send_to_wechat(text)
 
     def _record_login(self, channel_id: str, source: str = 'telegram'):
         now = datetime.now()
