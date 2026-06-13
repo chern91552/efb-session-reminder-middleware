@@ -44,7 +44,7 @@ class SessionReminderMiddleware(Middleware):
 
     middleware_id: ModuleID = ModuleID("efb_session_reminder")
     middleware_name: str = "Session Reminder Middleware"
-    __version__: str = '1.9.0'
+    __version__: str = '2.0.0'
 
     DEFAULT_SESSION_VALIDITY_DAYS = 30
     DEFAULT_REMINDER_THRESHOLDS = [5, 3, 1]
@@ -198,13 +198,24 @@ class SessionReminderMiddleware(Middleware):
 
             bot = wechat_channel.bot
 
-            # Get the base URL from config or loginInfo
+            # Get the core (itchat.Core) from the bot
+            core = None
+            if hasattr(bot, 'core'):
+                core = bot.core
+            elif hasattr(bot, 'update_core'):
+                # Some versions may use update_core
+                core = bot.update_core
+
+            if not core:
+                self.logger.warning("Cannot find itchat core in bot")
+                return None
+
             # Note: BASE_URL is 'https://login.weixin.qq.com' for push login
             base_url = "https://login.weixin.qq.com"
             self.logger.debug(f"Using base URL for push login: {base_url}")
 
-            # Get cookies
-            cookies = bot.s.cookies.get_dict()
+            # Get cookies from the core's session
+            cookies = core.s.cookies.get_dict()
             if 'wxuin' not in cookies:
                 self.logger.warning("No wxuin cookie found, cannot generate pre-emptive QR")
                 return None
@@ -216,8 +227,8 @@ class SessionReminderMiddleware(Middleware):
             self.logger.debug(f"Push login URL: {url}")
 
             try:
-                headers = {'User-Agent': bot.user_agent}
-                response = bot.s.get(url, headers=headers, timeout=10)
+                headers = {'User-Agent': core.user_agent}
+                response = core.s.get(url, headers=headers, timeout=10)
                 self.logger.debug(f"Push login response status: {response.status_code}")
             except Exception as e:
                 self.logger.error(f"Failed to fetch push login URL: {e}")
