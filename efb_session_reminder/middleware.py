@@ -44,7 +44,7 @@ class SessionReminderMiddleware(Middleware):
 
     middleware_id: ModuleID = ModuleID("efb_session_reminder")
     middleware_name: str = "Session Reminder Middleware"
-    __version__: str = '2.6.0'
+    __version__: str = '2.7.0'
 
     DEFAULT_SESSION_VALIDITY_DAYS = 30
     DEFAULT_REMINDER_THRESHOLDS = [5, 3, 1]
@@ -821,6 +821,9 @@ class SessionReminderMiddleware(Middleware):
             else:
                 self._send_to_wechat(text)
                 self._send_qr_to_wechat(qr_image)
+
+            # Logout WeChat to force re-login
+            self._force_wechat_logout()
         else:
             error_msg = (
                 "❌ 获取二维码失败\n\n"
@@ -834,6 +837,45 @@ class SessionReminderMiddleware(Middleware):
                 self._send_to_telegram(error_msg, "warning")
             else:
                 self._send_to_wechat(error_msg)
+
+    def _force_wechat_logout(self):
+        """Force WeChat to logout so user needs to re-login."""
+        try:
+            # Delete login time file to reset tracking
+            login_file = self.data_path / "login_times.json"
+            if login_file.exists():
+                try:
+                    login_file.unlink()
+                    self.logger.info("Deleted login time file to reset tracking")
+                except Exception as e:
+                    self.logger.error(f"Failed to delete login time file: {e}")
+
+            if not hasattr(coordinator, 'slaves') or 'blueset.wechat' not in coordinator.slaves:
+                self.logger.warning("WeChat slave channel not available")
+                return
+
+            wechat_channel = coordinator.slaves['blueset.wechat']
+
+            if not hasattr(wechat_channel, 'bot') or not wechat_channel.bot:
+                self.logger.warning("WeChat bot not available")
+                return
+
+            bot = wechat_channel.bot
+
+            # Check if bot has logout method
+            if hasattr(bot, 'logout'):
+                self.logger.info("Calling WeChat logout to force re-login...")
+                bot.logout()
+                self.logger.info("WeChat logged out successfully")
+            elif hasattr(bot, 'core') and hasattr(bot.core, 'logout'):
+                self.logger.info("Calling WeChat core logout to force re-login...")
+                bot.core.logout()
+                self.logger.info("WeChat logged out successfully")
+            else:
+                self.logger.warning("Cannot find logout method in WeChat bot")
+
+        except Exception as e:
+            self.logger.error(f"Failed to logout WeChat: {e}", exc_info=True)
 
     def _get_status_report(self) -> str:
         now = datetime.now()
