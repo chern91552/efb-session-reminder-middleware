@@ -44,7 +44,7 @@ class SessionReminderMiddleware(Middleware):
 
     middleware_id: ModuleID = ModuleID("efb_session_reminder")
     middleware_name: str = "Session Reminder Middleware"
-    __version__: str = '1.4.0'
+    __version__: str = '1.5.0'
 
     DEFAULT_SESSION_VALIDITY_DAYS = 30
     DEFAULT_REMINDER_THRESHOLDS = [5, 3, 1]
@@ -198,18 +198,44 @@ class SessionReminderMiddleware(Middleware):
 
             bot = wechat_channel.bot
 
-            import requests
+            # Get the base URL from loginInfo if available, otherwise use default
+            base_url = "https://wx.qq.com"
+            if hasattr(bot, 'core') and hasattr(bot.core, 'loginInfo'):
+                if 'url' in bot.core.loginInfo and bot.core.loginInfo['url']:
+                    base_url = bot.core.loginInfo['url']
+                    if base_url.startswith('https://'):
+                        base_url = base_url.split('/')[2]  # Extract domain
+                        base_url = f"https://{base_url}"
 
+            self.logger.debug(f"Using base URL: {base_url}")
+
+            # Get cookies
             cookies = bot.s.cookies.get_dict()
             if 'wxuin' not in cookies:
                 self.logger.warning("No wxuin cookie found, cannot generate pre-emptive QR")
                 return None
 
-            base_url = "https://wx.qq.com"
-            url = f"{base_url}/cgi-bin/mmwebwx-bin/webwxpushloginurl?uin={cookies['wxuin']}"
-            headers = {'User-Agent': bot.user_agent}
+            # Try different URL formats
+            urls_to_try = [
+                f"{base_url}/cgi-bin/mmwebwx-bin/webwxpushloginurl?uin={cookies['wxuin']}",
+                f"https://wx.qq.com/cgi-bin/mmwebwx-bin/webwxpushloginurl?uin={cookies['wxuin']}",
+                f"https://wechat.com/cgi-bin/mmwebwx-bin/webwxpushloginurl?uin={cookies['wxuin']}",
+            ]
 
-            response = bot.s.get(url, headers=headers)
+            response = None
+            for url in urls_to_try:
+                try:
+                    headers = {'User-Agent': bot.user_agent}
+                    response = bot.s.get(url, headers=headers, timeout=10)
+                    if response.status_code == 200:
+                        break
+                except Exception as e:
+                    self.logger.debug(f"Failed to fetch from {url}: {e}")
+                    continue
+
+            if not response or response.status_code != 200:
+                self.logger.warning(f"All push login URLs failed")
+                return None
 
             try:
                 result = response.json()
@@ -228,6 +254,7 @@ class SessionReminderMiddleware(Middleware):
                 self.logger.warning("pyqrcode not installed, cannot generate QR image")
                 return None
 
+            # Generate QR code with the UUID
             qr_url = f"https://login.weixin.qq.com/l/{uuid_str}"
             qr_code = PyQRCode(qr_url)
 
