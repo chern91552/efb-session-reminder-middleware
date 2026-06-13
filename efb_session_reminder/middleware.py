@@ -44,7 +44,7 @@ class SessionReminderMiddleware(Middleware):
 
     middleware_id: ModuleID = ModuleID("efb_session_reminder")
     middleware_name: str = "Session Reminder Middleware"
-    __version__: str = '1.7.0'
+    __version__: str = '1.8.0'
 
     DEFAULT_SESSION_VALIDITY_DAYS = 30
     DEFAULT_REMINDER_THRESHOLDS = [5, 3, 1]
@@ -198,16 +198,10 @@ class SessionReminderMiddleware(Middleware):
 
             bot = wechat_channel.bot
 
-            # Get the base URL from loginInfo if available, otherwise use default
-            base_url = "https://wx.qq.com"
-            if hasattr(bot, 'core') and hasattr(bot.core, 'loginInfo'):
-                if 'url' in bot.core.loginInfo and bot.core.loginInfo['url']:
-                    base_url = bot.core.loginInfo['url']
-                    if base_url.startswith('https://'):
-                        base_url = base_url.split('/')[2]  # Extract domain
-                        base_url = f"https://{base_url}"
-
-            self.logger.debug(f"Using base URL: {base_url}")
+            # Get the base URL from config or loginInfo
+            # Note: BASE_URL is 'https://login.weixin.qq.com' for push login
+            base_url = "https://login.weixin.qq.com"
+            self.logger.debug(f"Using base URL for push login: {base_url}")
 
             # Get cookies
             cookies = bot.s.cookies.get_dict()
@@ -215,30 +209,27 @@ class SessionReminderMiddleware(Middleware):
                 self.logger.warning("No wxuin cookie found, cannot generate pre-emptive QR")
                 return None
 
-            # Try different URL formats
-            urls_to_try = [
-                f"{base_url}/cgi-bin/mmwebwx-bin/webwxpushloginurl?uin={cookies['wxuin']}",
-                f"https://wx.qq.com/cgi-bin/mmwebwx-bin/webwxpushloginurl?uin={cookies['wxuin']}",
-                f"https://wechat.com/cgi-bin/mmwebwx-bin/webwxpushloginurl?uin={cookies['wxuin']}",
-            ]
+            self.logger.debug(f"Found wxuin cookie: {cookies['wxuin']}")
 
-            response = None
-            for url in urls_to_try:
-                try:
-                    headers = {'User-Agent': bot.user_agent}
-                    response = bot.s.get(url, headers=headers, timeout=10)
-                    if response.status_code == 200:
-                        break
-                except Exception as e:
-                    self.logger.debug(f"Failed to fetch from {url}: {e}")
-                    continue
+            # Build the push login URL
+            url = f"{base_url}/cgi-bin/mmwebwx-bin/webwxpushloginurl?uin={cookies['wxuin']}"
+            self.logger.debug(f"Push login URL: {url}")
 
-            if not response or response.status_code != 200:
-                self.logger.warning(f"All push login URLs failed")
+            try:
+                headers = {'User-Agent': bot.user_agent}
+                response = bot.s.get(url, headers=headers, timeout=10)
+                self.logger.debug(f"Push login response status: {response.status_code}")
+            except Exception as e:
+                self.logger.error(f"Failed to fetch push login URL: {e}")
+                return None
+
+            if response.status_code != 200:
+                self.logger.warning(f"Push login request failed with status: {response.status_code}")
                 return None
 
             try:
                 result = response.json()
+                self.logger.debug(f"Push login response: {result}")
             except Exception:
                 self.logger.error(f"Push login response is not valid JSON: {response.content}")
                 return None
