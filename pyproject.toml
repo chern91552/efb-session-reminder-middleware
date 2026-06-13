@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "efb-session-reminder-middleware"
+version = "1.4.0"
+description = "A middleware for EFB that reminds users before WeChat session expires"
+readme = "README.md"
+license = {text = "GPL-3.0"}
+authors = [
+    {name = "chern91552", email = "chern91552@example.com"}
+]
+url = "https://github.com/chern91552/efb-session-reminder-middleware"
+keywords = ["ehforwarderbot", "WeChat", "Session", "Reminder"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+    "Intended Audience :: Developers",
+    "Intended Audience :: End Users/Desktop",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Communications :: Chat",
+    "Topic :: Utilities"
+]
+requires-python = ">=3.7"
+dependencies = [
+    "ehforwarderbot>=2.0.0",
+    "ruamel.yaml",
+]
+
+[project.optional-dependencies]
+qr = ["pyqrcode"]
+
+[project.entry-points."ehforwarderbot.middleware"]
+efb_session_reminder = "efb_session_reminder:SessionReminderMiddleware"
