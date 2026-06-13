@@ -44,7 +44,7 @@ class SessionReminderMiddleware(Middleware):
 
     middleware_id: ModuleID = ModuleID("efb_session_reminder")
     middleware_name: str = "Session Reminder Middleware"
-    __version__: str = '1.6.0'
+    __version__: str = '1.7.0'
 
     DEFAULT_SESSION_VALIDITY_DAYS = 30
     DEFAULT_REMINDER_THRESHOLDS = [5, 3, 1]
@@ -517,7 +517,29 @@ class SessionReminderMiddleware(Middleware):
             for channel_id in self.monitored_channels:
                 if channel_id not in self._login_times:
                     # Check if this message is from a monitored channel
-                    if hasattr(message.author, 'module_id') and message.author.module_id == channel_id:
+                    # We check by the chat's channel_id or the message's deliver_to
+                    message_channel = None
+
+                    # Method 1: Check if message's chat has the channel's module_id
+                    if hasattr(message.chat, 'channel') and message.chat.channel:
+                        if hasattr(message.chat.channel, 'channel_id'):
+                            if message.chat.channel.channel_id == channel_id:
+                                message_channel = channel_id
+
+                    # Method 2: Check message author's module_id
+                    if not message_channel and hasattr(message.author, 'module_id'):
+                        if message.author.module_id == channel_id:
+                            message_channel = channel_id
+
+                    # Method 3: For WeChat messages, check if chat name contains WeChat-related info
+                    if not message_channel and channel_id == 'blueset.wechat':
+                        # Check if this is a WeChat message by checking attributes
+                        if hasattr(message, 'author') and message.author:
+                            # If the message comes from WeChat (not from Telegram to WeChat)
+                            if message.deliver_to != coordinator.master:
+                                message_channel = channel_id
+
+                    if message_channel:
                         # This is a message from the monitored channel
                         # Use the message's timestamp as the login time
                         if hasattr(message, 'time') and message.time:
